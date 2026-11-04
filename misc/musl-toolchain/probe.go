@@ -1,5 +1,8 @@
 package main
 
+/*
+#include <stdlib.h>
+*/
 import "C"
 import (
 	"os"
@@ -9,6 +12,13 @@ import (
 
 //export GoProbe
 func GoProbe() C.int {
+	// Exercise Go -> C -> Go, including _cgo_topofstack. With frame
+	// pointers enabled this detects TLS resolver stack corruption.
+	p := C.calloc(1, 32)
+	if p == nil {
+		return -2
+	}
+	C.free(p)
 	if os.Getenv("MUSL_PROBE") != "expected" {
 		return -1
 	}

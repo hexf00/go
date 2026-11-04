@@ -3,6 +3,10 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 : "${GOROOT_BOOTSTRAP:?请指定官方 Go 1.27.3 的 GOROOT_BOOTSTRAP}"
 export GOTOOLCHAIN=local
+if [[ $("$GOROOT_BOOTSTRAP/bin/go" env GOVERSION) != go1.27.3 ]]; then
+  echo 'bootstrap 必须为官方 Go 1.27.3' >&2
+  exit 1
+fi
 export GOMAXPROCS=${GOMAXPROCS:-4}
 cd "$root/src"
 CGO_ENABLED=0 ./make.bash

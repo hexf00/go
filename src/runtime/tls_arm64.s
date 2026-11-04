@@ -22,13 +22,18 @@ TEXT runtime·load_g(SB),NOSPLIT,$0
 	// General Dynamic TLS model (TLSDESC).
 	// The MOVD below generates: adrp x0; ldr x1; add x0; blr x1
 	// TLSDESC ABI clobbers X0, X1, and LR (X30).
-	// Callers expect save_g/load_g to only clobber R0 and R27,
-	// so we save R1 and LR to scratch registers R10 and R11.
-	MOVD	R1, R10
-	MOVD	R30, R11
+	// Callers expect save_g/load_g to only clobber R0 and R27.
+	// A Go caller may save its frame pointer at SP-8, below its frame.
+	// The C ABI TLSDESC resolver is allowed to use that stack slot.
+	// Reserve an aligned call frame before invoking it, and preserve
+	// R1/LR on the stack without clobbering other Go runtime registers.
+	SUB	$32, RSP
+	MOVD	R1, 8(RSP)
+	MOVD	R30, 16(RSP)
 	MOVD	runtime·tls_g(SB), R0
-	MOVD	R10, R1
-	MOVD	R11, R30
+	MOVD	8(RSP), R1
+	MOVD	16(RSP), R30
+	ADD	$32, RSP
 	MOVD	R0, R27
 	MRS_TPIDR_R0
 	MOVD	(R0)(R27), g
@@ -58,11 +63,17 @@ TEXT runtime·save_g(SB),NOSPLIT,$0
 #ifdef TLS_GD
 	// General Dynamic TLS model (TLSDESC).
 	// Save R1 and LR — callers may have live values in these regs.
-	MOVD	R1, R10
-	MOVD	R30, R11
+	// A Go caller may save its frame pointer at SP-8, below its frame.
+	// The C ABI TLSDESC resolver is allowed to use that stack slot.
+	// Reserve an aligned call frame before invoking it, and preserve
+	// R1/LR on the stack without clobbering other Go runtime registers.
+	SUB	$32, RSP
+	MOVD	R1, 8(RSP)
+	MOVD	R30, 16(RSP)
 	MOVD	runtime·tls_g(SB), R0
-	MOVD	R10, R1
-	MOVD	R11, R30
+	MOVD	8(RSP), R1
+	MOVD	16(RSP), R30
+	ADD	$32, RSP
 	MOVD	R0, R27
 	MRS_TPIDR_R0
 	MOVD	g, (R0)(R27)

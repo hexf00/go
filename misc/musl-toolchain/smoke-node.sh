@@ -4,7 +4,7 @@ root=$(cd "$(dirname "$0")/../.." && pwd)
 export GOROOT="$root" PATH="$root/bin:$PATH" GOTOOLCHAIN=local
 mkdir -p "$root/out/probe"
 cd "$root/out/probe"
-GO111MODULE=off CGO_ENABLED=1 CC=musl-gcc go build -buildmode=c-archive -o probe.a "$root/misc/musl-toolchain/probe.go"
+GO111MODULE=off CGO_ENABLED=1 CC=musl-gcc CGO_CFLAGS="-O0 -fno-omit-frame-pointer" go build -buildmode=c-archive -o probe.a "$root/misc/musl-toolchain/probe.go"
 musl-gcc -shared -fPIC -I/usr/include/node "$root/misc/musl-toolchain/probe.c" probe.a -lpthread -ldl -lm -o probe.node
 readelf -d probe.node > elf.txt
 if grep -q STATIC_TLS elf.txt; then
