@@ -1,0 +1,40 @@
+name: musl 专用 Go 编译器
+on:
+  push:
+    branches: [codex/musl-go1.27.3]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: 固定 bootstrap 并构建
+        run: |
+          export GOROOT_BOOTSTRAP=$(go env GOROOT)
+          misc/musl-toolchain/build.sh
+      - name: 验证 musl Node 加载
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y musl-tools libnode-dev
+          misc/musl-toolchain/smoke-node.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: go1.27.3-hexf00-musl.1-linux-${{ matrix.arch }}
+          path: out/*
+          retention-days: 90
+          if-no-files-found: error

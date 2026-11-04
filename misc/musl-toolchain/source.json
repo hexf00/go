@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "toolchain": "go1.27.3-hexf00-musl.1",
+  "upstreamTag": "go1.27.3",
+  "upstreamCommit": "2aae1000ea1d4b28923b96db28acf4e3b99d6aff",
+  "patchURL": "https://go-review.googlesource.com/c/go/+/696635/4",
+  "patchRevision": "5f5911fabb3af7b5662ebc17ff7fa4f881df903a",
+  "patchSHA256": "a7b8528b8100cdb0af0f2baa665a602ef9dd8aede485dbab20a0751057333a6f",
+  "bootstrap": "go1.27.3",
+  "targets": [
+    "linux/amd64",
+    "linux/arm64"
+  ]
+}

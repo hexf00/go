@@ -11,6 +11,12 @@
 void (*x_cgo_inittls)(void **tlsg, void **tlsbase) __attribute__((weak));
 void (*x_cgo_threadentry_platform)(void) __attribute__((weak));
 
+#ifdef __linux__
+// glibc supplies argc/argv to ELF constructors; musl follows the ELF ABI.
+extern const char *gnu_get_libc_version(void) __attribute__((weak));
+uint8_t x_cgo_isglibc;
+#endif
+
 static void (*setg_gcc)(void*);
 
 // _cgo_set_stacklo sets g->stacklo based on the stack size.
@@ -38,6 +44,9 @@ x_cgo_init(G *g, void (*setg)(void*), void **tlsg, void **tlsbase)
 {
 	setg_gcc = setg;
 	_cgo_set_stacklo(g);
+#ifdef __linux__
+	x_cgo_isglibc = (gnu_get_libc_version != nil) ? 1 : 0;
+#endif
 
 	if (x_cgo_inittls) {
 		x_cgo_inittls(tlsg, tlsbase);
