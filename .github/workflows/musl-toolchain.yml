@@ -2,6 +2,15 @@ name: musl 专用 Go 编译器
 on:
   push:
     branches: [codex/musl-go1.27.3]
+    paths:
+      - VERSION
+      - go.env
+      - 'src/**'
+      - misc/musl-toolchain/build.sh
+      - misc/musl-toolchain/smoke-node.sh
+      - misc/musl-toolchain/probe.go
+      - misc/musl-toolchain/probe.c
+      - misc/musl-toolchain/source.json
   workflow_dispatch:
 permissions:
   contents: read

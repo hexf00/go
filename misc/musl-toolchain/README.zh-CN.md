@@ -21,3 +21,8 @@
 消费者必须固定完整源码提交、压缩包 SHA-256，并验证 `toolchain-identity.json`；解压后设置 `GOROOT`、`PATH`、`GOTOOLCHAIN=local`，确认 `go version` 包含 `hexf00-musl.1`。必须移除 archive 脚本中强制 `GOTOOLCHAIN=go1.24.3` 的设置，否则会静默切回官方工具链。不要通过未固定的分支名、latest、仅版本字符串或缓存命中判断身份。
 
 GitHub Actions artifact 会到期，不能作为永久发行仓库；保存经验证的压缩包及校验值后再接入长期存储。缓存只加速，不作为唯一来源。Go 安全更新或升级时需适配补丁、重编工具链，重跑两种架构的真实 PDF `.node` 消费者验证。构建通过只证明工具链生成成功，不能代表 PDF 已验收。
+
+
+## 候选发行
+
+`publication.json` 指定已成功的构建运行、完整源码提交和维护者已准备的 prerelease 草稿。专用发布 workflow 只转存已有 CI 压缩包，不重新编译 Go；校验同仓工作流、源码、两架构检查结果、压缩包摘要及内置身份后才发布。已有同名资产摘要不同或 Release 已公开时拒绝覆盖。编译 workflow 的 push 路径只覆盖源码及构建输入，发布配置与普通文档变更不会重复构建编译器；修改构建入口时需显式重验。

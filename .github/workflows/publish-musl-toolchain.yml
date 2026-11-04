@@ -1,0 +1,76 @@
+name: 发布已验证的 musl Go 编译器
+on:
+  push:
+    branches: [codex/musl-go1.27.3]
+    paths:
+      - .github/workflows/publish-musl-toolchain.yml
+      - misc/musl-toolchain/publication.json
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: 校验来源并转存已有 CI 产物
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/contents/misc/musl-toolchain/publication.json?ref=$GITHUB_SHA" --jq .content | base64 -d > "$RUNNER_TEMP/publication.json"
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib,re,subprocess,tarfile
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])/'publish-go'
+          root.mkdir()
+          config=json.loads((pathlib.Path(os.environ['RUNNER_TEMP'])/'publication.json').read_text())
+          repo=os.environ['GITHUB_REPOSITORY']
+          api=lambda route:json.loads(subprocess.check_output(['gh','api',f'repos/{repo}/{route}']))
+          run=api(f"actions/runs/{config['buildRun']}")
+          assert run['head_sha']==config['sourceCommit'] and run['head_repository']['full_name']==repo
+          assert run['path'].split('@')[0]=='.github/workflows/musl-toolchain.yml'
+          assert run['status']=='completed' and run['conclusion']=='success'
+          release=api(f"releases/{config['releaseId']}")
+          assert release['draft'] and release['prerelease']
+          assert release['tag_name']==config['version'] and release['target_commitish']==config['sourceCommit']
+          jobs=api(f"actions/runs/{config['buildRun']}/jobs?per_page=100")['jobs']
+          artifacts=api(f"actions/runs/{config['buildRun']}/artifacts?per_page=100")['artifacts']
+          manifest={'schema':1,'toolchain':config['version'],'repository':f'https://github.com/{repo}',
+                    'sourceCommit':config['sourceCommit'],'buildRun':config['buildRun'],'artifacts':[]}
+          files=[]
+          for arch in ['amd64','arm64']:
+              assert any(j['conclusion']=='success' and f', {arch})' in j['name'] for j in jobs)
+              name=f"{config['version']}-linux-{arch}"
+              assert any(a['name']==name and not a['expired'] for a in artifacts)
+              directory=root/arch
+              subprocess.run(['gh','run','download',str(config['buildRun']),'--repo',repo,'--name',name,'--dir',str(directory)],check=True)
+              filename=f"{config['version']}.linux-{arch}.tar.gz"
+              archive=directory/filename
+              digest=hashlib.sha256(archive.read_bytes()).hexdigest()
+              assert digest==(directory/(filename+'.sha256')).read_text().split()[0]
+              with tarfile.open(archive) as stream:
+                  member=next(m for m in stream if m.name=='go/toolchain-identity.json')
+                  assert member.isfile() and member.size<65536
+                  identity=json.load(stream.extractfile(member))
+              assert identity['sourceCommit']==config['sourceCommit'] and identity['sourceDirty'] is False
+              assert identity['host']==['linux',arch]
+              assert identity['version']==f"go version {config['version']} linux/{arch}"
+              manifest['artifacts'].append({'architecture':arch,'filename':filename,'sha256':digest,'identity':identity})
+              files += [archive,directory/(filename+'.sha256')]
+          index=root/'manifest.json'
+          index.write_text(json.dumps(manifest,indent=2)+'\n')
+          files.append(index)
+          for file in files:
+              expected='sha256:'+hashlib.sha256(file.read_bytes()).hexdigest()
+              existing=next((a for a in api(f"releases/{config['releaseId']}")['assets'] if a['name']==file.name),None)
+              if existing:
+                  assert existing['state']=='uploaded' and existing['digest']==expected, 'Refusing to replace an existing asset'
+              else:
+                  subprocess.run(['gh','release','upload',config['version'],str(file),'--repo',repo],check=True)
+              actual=next(a for a in api(f"releases/{config['releaseId']}")['assets'] if a['name']==file.name)
+              assert actual['state']=='uploaded' and actual['digest']==expected
+          subprocess.run(['gh','release','edit',config['version'],'--repo',repo,'--draft=false','--prerelease','--latest=false'],check=True)
+          print(f"Published {config['version']} from {config['sourceCommit']}")
+          PY
