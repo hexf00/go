@@ -414,21 +414,25 @@ var procEnviron = []byte("/proc/self/environ\x00")
 // goenvs_lib reads environment variables from /proc/self/environ for use
 // in library/archive mode where argv-based environment discovery is unsafe.
 func goenvs_lib() {
-	// /proc/self/environ contains NUL-separated KEY=VALUE pairs.
-	const bufSize = 8 << 10 // 8KB; we are on the system stack (64KB)
-	var buf [bufSize]byte
-
+	// /proc/self/environ contains NUL-separated KEY=VALUE pairs. Read to EOF:
+	// real Node hosts can have more than 8 KiB of environment variables.
+	// Keep the system-stack buffer small and retain contents on the heap.
+	var chunk [4096]byte
+	var buf []byte
 	fd := open(&procEnviron[0], 0 /* O_RDONLY */, 0)
 	if fd < 0 {
 		envs = make([]string, 0)
 		return
 	}
-	n := read(fd, noescape(unsafe.Pointer(&buf[0])), int32(bufSize))
-	closefd(fd)
-	if n <= 0 {
-		envs = make([]string, 0)
-		return
+	for {
+		n := read(fd, noescape(unsafe.Pointer(&chunk[0])), int32(len(chunk)))
+		if n <= 0 {
+			break
+		}
+		buf = append(buf, chunk[:n]...)
 	}
+	closefd(fd)
+	n := int32(len(buf))
 
 	// Count NUL-separated entries.
 	count := 0

@@ -17,7 +17,11 @@ case $(go env GOHOSTARCH) in
   arm64) image=node@sha256:32c5587d8f5b56bdfacbe832773059a2319aca74369bd61163e0c04726b1fd6d ;;
   *) exit 1 ;;
 esac
-docker run --rm -e MUSL_PROBE=expected -v "$PWD:/probe:ro" "$image" node -e '
+python3 - <<'PYENV'
+from pathlib import Path
+Path('probe.env').write_text('PADDING=' + 'x' * 32768 + '\nMUSL_PROBE=expected\n')
+PYENV
+docker run --rm --env-file probe.env -v "$PWD:/probe:ro" "$image" node -e '
 const {Worker} = require("node:worker_threads");
 const assert = require("node:assert/strict");
 assert.equal(require("/probe/probe.node").result, 42);

@@ -8,7 +8,7 @@
 
 补丁为 archive/shared 构建生成动态 TLS 访问，允许 musl 在 Node 运行后加载含 Go runtime 的共享库；同时处理非 glibc 的 ELF 初始化函数不提供 argc/argv 的情况。适配 1.27.3 时，glibc 检测符号单独放入 `callbacks_linux.go`，避免给其他平台引入 Linux 符号；`gcc_unix.c` 保留官方的新初始化入口。
 
-行为差异：该工具链构建的 Go library/archive 中 `os.Args` 为空；musl 下环境变量和辅助向量从 `/proc/self` 读取，受容器 `/proc` 权限约束。上游候选的环境读取还有 8 KiB 限制。现有消费者不能依赖进程参数；这些差异与 TLS 修复都需要在真实 PDF 消费者中验证。只验证 Linux amd64、arm64；不承诺其他架构、Go plugin、race、所有 cgo 或任意宿主程序兼容。
+行为差异：该工具链构建的 Go library/archive 中 `os.Args` 为空；musl 下环境变量和辅助向量从 `/proc/self` 读取，受容器 `/proc` 权限约束。本分支将上游候选的固定 8 KiB 环境读取改为读到 EOF，避免较大宿主环境丢失变量，并加入 32 KiB 环境下的 Node 加载检查。现有消费者不能依赖进程参数；这些差异与 TLS 修复都需要在真实 PDF 消费者中验证。只验证 Linux amd64、arm64；不承诺其他架构、Go plugin、race、所有 cgo 或任意宿主程序兼容。
 
 ## 构建、保存与使用
 
